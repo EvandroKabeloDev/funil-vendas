@@ -1,0 +1,75 @@
+/* =====================================================================
+   ETAPA 4 — tela de Desempenho
+   ===================================================================== */
+
+.seg{display:flex;gap:6px;background:#0b0b0b;border:1px solid var(--line);border-radius:11px;padding:5px}
+.seg button{flex:1;border:0;background:transparent;color:var(--muted);padding:10px 8px;border-radius:8px;font-size:13px;font-weight:800;white-space:nowrap}
+.seg button:hover{color:#fff}
+.seg button.active{background:#241307;color:var(--orange2)}
+
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.kpi{padding:20px}
+.kpi-label{display:block;color:var(--muted);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.09em}
+.kpi-value{display:block;font-size:38px;font-weight:900;letter-spacing:-.04em;margin:9px 0 5px;line-height:1}
+.kpi small{color:#777;font-size:12px}
+.kpi.destaque{border-color:#61300e;background:linear-gradient(145deg,#1d1206,#120c05)}
+.kpi.destaque .kpi-value{color:var(--orange2)}
+
+.funnel-chart{display:grid;gap:11px}
+.fc-row{display:grid;grid-template-columns:130px 1fr 120px;gap:14px;align-items:center}
+.fc-label{font-size:13px;font-weight:800;color:#ccc}
+.fc-track{background:#0b0b0b;border:1px solid #202020;border-radius:9px;height:40px;overflow:hidden}
+.fc-bar{height:100%;background:linear-gradient(90deg,var(--orange),var(--orange2));border-radius:8px;display:flex;align-items:center;padding:0 12px;min-width:42px;transition:width .35s ease}
+.fc-bar span{font-size:14px;font-weight:900;color:#111}
+.fc-pct{text-align:right;font-size:15px;font-weight:850}
+.fc-pct small{display:block;color:#666;font-size:10px;font-weight:600;margin-top:2px}
+
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted)}
+.legend span{display:flex;align-items:center;gap:6px}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.dot.orange{background:var(--orange)}
+.dot.green{background:var(--green)}
+
+.spark{display:flex;gap:3px;align-items:flex-end;height:190px;overflow-x:auto;padding-bottom:4px}
+.spark-col{flex:1;min-width:26px;display:flex;flex-direction:column;align-items:center;gap:7px;height:100%}
+.spark-bars{flex:1;display:flex;align-items:flex-end;gap:2px;width:100%;justify-content:center}
+.sb{width:44%;border-radius:3px 3px 0 0;min-height:2px;transition:height .3s}
+.sb.leads{background:var(--orange)}
+.sb.vendas{background:var(--green)}
+.spark-x{font-size:9px;color:#666;white-space:nowrap}
+
+.reason-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.reason-card{background:#0c0c0c;border:1px solid #242424;border-top:3px solid var(--line);border-radius:13px;padding:17px}
+.rc-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:15px}
+.rc-head strong{font-size:15px}
+.rc-head span{font-size:12px;color:#777}
+.rc-item{margin-bottom:12px}
+.rc-top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px}
+.rc-top span{color:#aaa}
+.rc-track{height:7px;background:#191919;border-radius:99px;overflow:hidden}
+.rc-fill{height:100%;border-radius:99px;transition:width .35s}
+
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.rank-table{width:100%;border-collapse:collapse;font-size:14px;min-width:640px}
+.rank-table th{text-align:left;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.07em;padding:0 10px 11px;font-weight:800;white-space:nowrap}
+.rank-table td{padding:13px 10px;border-top:1px solid #1d1d1d;white-space:nowrap}
+.rank-table td.dim{color:#777}
+.pos{display:inline-grid;place-items:center;width:23px;height:23px;border-radius:7px;background:#1a1a1a;color:#888;font-size:11px;font-weight:900;margin-right:9px}
+.pos.top{background:linear-gradient(145deg,var(--orange2),var(--orange));color:#111}
+.conv{font-weight:850}
+.conv.alta{color:var(--green)}
+.conv.media{color:var(--yellow)}
+.conv.zero{color:#666}
+
+@media(max-width:900px){
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  .reason-grid{grid-template-columns:1fr}
+  .fc-row{grid-template-columns:96px 1fr 86px;gap:9px}
+  .fc-label{font-size:12px}
+  .fc-pct{font-size:13px}
+  .kpi-value{font-size:31px}
+}
+@media(max-width:450px){
+  .seg{flex-wrap:wrap}
+  .seg button{flex:1 1 40%}
+}

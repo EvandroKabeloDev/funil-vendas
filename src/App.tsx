@@ -2,7 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Cadastros from './pages/Cadastros'
 import Lancamento from './pages/Lancamento'
-import EmBreve from './pages/EmBreve'
+import Desempenho from './pages/Desempenho'
 import AppShell from './components/AppShell'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { ToastProvider } from './components/Toast'
@@ -25,7 +25,7 @@ export default function App() {
           path="/app/desempenho"
           element={
             <ProtectedRoute>
-              <AppShell><EmBreve etapa={4} tela="Desempenho" /></AppShell>
+              <AppShell><Desempenho /></AppShell>
             </ProtectedRoute>
           }
         />
