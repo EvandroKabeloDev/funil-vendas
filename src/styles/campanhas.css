@@ -1,0 +1,25 @@
+/* =====================================================================
+   ETAPA 8 — Campanhas
+   ===================================================================== */
+
+/* seletor de campanha ao lado do título "Leads recebidos" */
+.head-campanha{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.head-campanha label{
+  color:var(--muted);font-size:11px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;
+}
+.head-campanha select{
+  height:40px;min-width:190px;max-width:260px;
+  border:1px solid var(--line);border-radius:10px;background:#0b0b0b;
+  color:#fff;padding:0 12px;font-size:15px;outline:none;
+}
+.head-campanha select:focus{border-color:var(--orange)}
+
+/* o cabeçalho do card precisa respirar quando ganha o seletor */
+.card-head.com-campanha{align-items:center;gap:14px;flex-wrap:wrap}
+
+@media(max-width:640px){
+  .card-head.com-campanha{align-items:stretch}
+  .head-campanha{width:100%}
+  .head-campanha select{flex:1;min-width:0;max-width:none}
+}

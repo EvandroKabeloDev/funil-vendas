@@ -5,7 +5,8 @@ import { useAuth } from '../lib/AuthContext'
 const META: Record<string, [string, string]> = {
   '/app/lancamento': ['Controle diário', 'Lançamento do funil'],
   '/app/desempenho': ['Análise da equipe', 'Desempenho comercial'],
-  '/app/cadastros': ['Configuração', 'Equipes e corretores']
+  '/app/campanhas':  ['Origem dos leads', 'Campanhas'],
+  '/app/cadastros':  ['Configuração', 'Equipes e corretores']
 }
 
 export default function AppShell({ children }: { children: ReactNode }) {
@@ -30,6 +31,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </NavLink>
           <NavLink to="/app/desempenho" className="nav-btn">
             <span className="nav-icon">▥</span>Desempenho
+          </NavLink>
+          <NavLink to="/app/campanhas" className="nav-btn">
+            <span className="nav-icon">◎</span>Campanhas
           </NavLink>
           {isGestor && (
             <NavLink to="/app/cadastros" className="nav-btn">

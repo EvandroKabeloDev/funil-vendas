@@ -14,6 +14,15 @@ export type Broker = {
   is_active: boolean
 }
 
+export type Campaign = {
+  id: string
+  org_id: string
+  name: string
+  is_active: boolean
+  created_by: string | null
+  created_at: string
+}
+
 export type TeamMate = {
   id: string
   full_name: string

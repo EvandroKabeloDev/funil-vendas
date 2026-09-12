@@ -3,6 +3,7 @@ import Login from './pages/Login'
 import Cadastros from './pages/Cadastros'
 import Lancamento from './pages/Lancamento'
 import Desempenho from './pages/Desempenho'
+import Campanhas from './pages/Campanhas'
 import AppShell from './components/AppShell'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { ToastProvider } from './components/Toast'
@@ -13,30 +14,18 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
 
-        <Route
-          path="/app/lancamento"
-          element={
-            <ProtectedRoute>
-              <AppShell><Lancamento /></AppShell>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/app/desempenho"
-          element={
-            <ProtectedRoute>
-              <AppShell><Desempenho /></AppShell>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/app/cadastros"
-          element={
-            <ProtectedRoute gestorOnly>
-              <AppShell><Cadastros /></AppShell>
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/app/lancamento" element={
+          <ProtectedRoute><AppShell><Lancamento /></AppShell></ProtectedRoute>
+        } />
+        <Route path="/app/desempenho" element={
+          <ProtectedRoute><AppShell><Desempenho /></AppShell></ProtectedRoute>
+        } />
+        <Route path="/app/campanhas" element={
+          <ProtectedRoute><AppShell><Campanhas /></AppShell></ProtectedRoute>
+        } />
+        <Route path="/app/cadastros" element={
+          <ProtectedRoute gestorOnly><AppShell><Cadastros /></AppShell></ProtectedRoute>
+        } />
 
         <Route path="/app" element={<Navigate to="/app/lancamento" replace />} />
         <Route path="*" element={<Navigate to="/app/lancamento" replace />} />
