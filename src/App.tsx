@@ -1,14 +1,45 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
-import Home from './pages/Home'
+import Cadastros from './pages/Cadastros'
+import EmBreve from './pages/EmBreve'
+import AppShell from './components/AppShell'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { ToastProvider } from './components/Toast'
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/app" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-      <Route path="*" element={<Navigate to="/app" replace />} />
-    </Routes>
+    <ToastProvider>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+
+        <Route
+          path="/app/lancamento"
+          element={
+            <ProtectedRoute>
+              <AppShell><EmBreve etapa={3} tela="Lançamento" /></AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/app/desempenho"
+          element={
+            <ProtectedRoute>
+              <AppShell><EmBreve etapa={4} tela="Desempenho" /></AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/app/cadastros"
+          element={
+            <ProtectedRoute gestorOnly>
+              <AppShell><Cadastros /></AppShell>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route path="/app" element={<Navigate to="/app/lancamento" replace />} />
+        <Route path="*" element={<Navigate to="/app/lancamento" replace />} />
+      </Routes>
+    </ToastProvider>
   )
 }
