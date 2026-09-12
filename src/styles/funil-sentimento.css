@@ -1,0 +1,48 @@
+/* =====================================================================
+   ETAPA 7 — barra de Leads segmentada por temperatura
+   ===================================================================== */
+
+/* a barra de leads deixa de ter fundo próprio: quem pinta são os segmentos */
+.fc-bar.segmentado{
+  background:none;padding:0;display:flex;overflow:hidden;
+  border-radius:8px;gap:1px;
+}
+.fc-seg{
+  height:100%;display:flex;align-items:center;justify-content:center;
+  min-width:3px;transition:width .35s ease;
+}
+.fc-seg span{
+  font-size:12px;font-weight:900;color:#111;
+  text-shadow:0 1px 2px #ffffff55;white-space:nowrap;padding:0 4px;
+}
+.fc-seg.vazio{
+  background:repeating-linear-gradient(45deg,#2a2a2a,#2a2a2a 4px,#1e1e1e 4px,#1e1e1e 8px);
+}
+.fc-seg:first-child{border-radius:8px 0 0 8px}
+.fc-seg:last-child{border-radius:0 8px 8px 0}
+.fc-seg:only-child{border-radius:8px}
+
+/* legenda usa cor inline, então o .dot precisa ficar neutro */
+.legend .dot{flex-shrink:0}
+
+/* resumo numérico abaixo do funil */
+.sent-summary{
+  display:flex;flex-wrap:wrap;gap:10px;
+  margin-top:18px;padding-top:16px;border-top:1px solid #1d1d1d;
+}
+.ss-item{
+  flex:1;min-width:150px;display:flex;align-items:center;gap:9px;
+  background:#0c0c0c;border:1px solid #202020;border-radius:11px;padding:11px 13px;
+}
+.ss-item .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.ss-item strong{font-size:13px;flex:1}
+.ss-item span{font-size:15px;font-weight:850;white-space:nowrap}
+.ss-item span small{color:#777;font-size:12px;font-weight:600}
+
+@media(max-width:900px){
+  .fc-seg span{font-size:10px}
+  .ss-item{min-width:calc(50% - 5px)}
+}
+@media(max-width:450px){
+  .ss-item{min-width:100%}
+}

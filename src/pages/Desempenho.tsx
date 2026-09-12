@@ -4,12 +4,12 @@ import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../components/Toast'
 import { traduzErro, type Broker, type Team } from '../lib/types'
 import {
-  PERIODOS, diaCurto, intervalo, montarFunil, pct, porCorretor, porMotivo,
-  serieDiaria, soma, type EntryRow, type Periodo
+  PERIODOS, composicaoLeads, diaCurto, intervalo, montarFunil, pct,
+  porCorretor, porMotivo, serieDiaria, soma, type EntryRow, type Periodo
 } from '../lib/analytics'
 
 export default function Desempenho() {
-  const { profile, isGestor } = useAuth()
+  const { isGestor } = useAuth()
   const toast = useToast()
 
   const [rows, setRows] = useState<EntryRow[]>([])
@@ -53,7 +53,6 @@ export default function Desempenho() {
 
   useEffect(() => { carregar() }, [carregar])
 
-  // limpa o corretor quando ele nao pertence mais a equipe filtrada
   useEffect(() => {
     if (brokerId && teamId) {
       const b = brokers.find(x => x.id === brokerId)
@@ -62,6 +61,7 @@ export default function Desempenho() {
   }, [teamId, brokerId, brokers])
 
   const funil = useMemo(() => montarFunil(rows), [rows])
+  const composicao = useMemo(() => composicaoLeads(rows), [rows])
   const ranking = useMemo(() => porCorretor(rows), [rows])
   const motivos = useMemo(() => porMotivo(rows), [rows])
   const serie = useMemo(() => serieDiaria(rows, de, ate), [rows, de, ate])
@@ -72,8 +72,11 @@ export default function Desempenho() {
   const totProp = soma(rows, 'proposals')
   const diasAtivos = new Set(rows.map(r => r.entry_date)).size
   const brokersFiltrados = teamId ? brokers.filter(b => b.team_id === teamId) : brokers
-
   const maxSerie = Math.max(...serie.map(s => s.leads), 1)
+
+  // leads lançados sem classificação de temperatura
+  const classificados = composicao.reduce((t, f) => t + f.valor, 0)
+  const semClassificar = Math.max(totLeads - classificados, 0)
 
   if (loading) return <div className="panel card"><div className="empty">Carregando indicadores…</div></div>
 
@@ -85,11 +88,9 @@ export default function Desempenho() {
           <label>Período</label>
           <div className="seg">
             {PERIODOS.map(p => (
-              <button
-                key={p.key}
-                className={periodo === p.key ? 'active' : ''}
-                onClick={() => setPeriodo(p.key)}
-              >{p.label}</button>
+              <button key={p.key} className={periodo === p.key ? 'active' : ''} onClick={() => setPeriodo(p.key)}>
+                {p.label}
+              </button>
             ))}
           </div>
         </div>
@@ -150,23 +151,70 @@ export default function Desempenho() {
           <div className="panel card">
             <div className="card-head">
               <h2>Funil de conversão</h2>
-              <span className="pill">{de.split('-').reverse().join('/')} a {ate.split('-').reverse().join('/')}</span>
+              <div className="legend">
+                {composicao.map(f => (
+                  <span key={f.key}><i className="dot" style={{ background: f.cor }} />{f.label}</span>
+                ))}
+              </div>
             </div>
+
             <div className="funnel-chart">
               {funil.map((f, i) => (
                 <div className="fc-row" key={f.key}>
                   <div className="fc-label">{f.label}</div>
                   <div className="fc-track">
-                    <div className="fc-bar" style={{ width: `${f.largura}%` }}>
-                      <span>{f.valor}</span>
-                    </div>
+                    {f.key === 'leads' ? (
+                      // Barra de Leads: segmentada pela temperatura dos leads
+                      <div className="fc-bar segmentado" style={{ width: `${f.largura}%` }}>
+                        {composicao.map(s => s.valor > 0 && (
+                          <div
+                            key={s.key}
+                            className="fc-seg"
+                            style={{ width: `${pct(s.valor, classificados || 1)}%`, background: s.cor }}
+                            title={`${s.label}: ${s.valor} lead(s) — ${s.pct}%`}
+                          >
+                            {s.pct >= 8 && <span>{s.pct}%</span>}
+                          </div>
+                        ))}
+                        {semClassificar > 0 && (
+                          <div
+                            className="fc-seg vazio"
+                            style={{ width: `${pct(semClassificar, classificados || 1)}%` }}
+                            title={`Sem classificação: ${semClassificar} lead(s)`}
+                          />
+                        )}
+                      </div>
+                    ) : (
+                      <div className="fc-bar" style={{ width: `${f.largura}%` }}>
+                        <span>{f.valor}</span>
+                      </div>
+                    )}
                   </div>
                   <div className="fc-pct">
-                    {f.pctBase}%
+                    {f.key === 'leads' ? f.valor : `${f.pctBase}%`}
                     {i > 0 && <small>{f.pctEtapa}% da etapa anterior</small>}
+                    {i === 0 && <small>total de leads</small>}
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* resumo numérico da composição */}
+            <div className="sent-summary">
+              {composicao.map(s => (
+                <div className="ss-item" key={s.key}>
+                  <i className="dot" style={{ background: s.cor }} />
+                  <strong>{s.label}</strong>
+                  <span>{s.valor} <small>({s.pct}%)</small></span>
+                </div>
+              ))}
+              {semClassificar > 0 && (
+                <div className="ss-item">
+                  <i className="dot" style={{ background: '#3a3a3a' }} />
+                  <strong>Sem classificação</strong>
+                  <span>{semClassificar} <small>({pct(semClassificar, totLeads)}%)</small></span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -238,10 +286,7 @@ export default function Desempenho() {
                 <tbody>
                   {ranking.map((r, i) => (
                     <tr key={r.id}>
-                      <td>
-                        <span className={`pos ${i === 0 ? 'top' : ''}`}>{i + 1}</span>
-                        {r.nome}
-                      </td>
+                      <td><span className={`pos ${i === 0 ? 'top' : ''}`}>{i + 1}</span>{r.nome}</td>
                       <td className="dim">{r.equipe}</td>
                       <td>{r.leads}</td>
                       <td>{r.agendamentos}</td>

@@ -71,6 +71,28 @@ export const ETAPAS_FUNIL_VIS = [
   { key: 'sales',         label: 'Vendas'         }
 ] as const
 
+/** Composicao da barra de Leads por temperatura (frio -> morno -> quente). */
+export type FatiaSentimento = {
+  key: 'cold' | 'warm' | 'hot'
+  label: string
+  valor: number
+  pct: number
+  cor: string
+}
+
+export function composicaoLeads(rows: EntryRow[]): FatiaSentimento[] {
+  const leads = soma(rows, 'leads')
+  const defs = [
+    { key: 'cold' as const, label: 'Frio',   cor: 'var(--blue)'   },
+    { key: 'warm' as const, label: 'Morno',  cor: 'var(--yellow)' },
+    { key: 'hot'  as const, label: 'Quente', cor: 'var(--danger)' }
+  ]
+  return defs.map(d => {
+    const valor = soma(rows, d.key)
+    return { ...d, valor, pct: pct(valor, leads) }
+  })
+}
+
 /** Funil com conversao acumulada (vs. leads) e etapa a etapa. */
 export function montarFunil(rows: EntryRow[]) {
   const base = soma(rows, 'leads')
