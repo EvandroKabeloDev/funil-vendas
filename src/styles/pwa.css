@@ -1,0 +1,53 @@
+/* =====================================================================
+   ETAPA 5 — camada de PWA (conexão, instalação, atualização)
+   ===================================================================== */
+
+.net-bar{
+  position:fixed;top:0;left:0;right:0;z-index:60;
+  display:flex;align-items:center;justify-content:center;gap:9px;
+  padding:calc(9px + env(safe-area-inset-top)) 16px 9px;
+  font-size:13px;font-weight:800;text-align:center;
+  animation:slideDown .25s ease;
+}
+.net-bar.offline{background:#3a1013;color:#ffc9cb;border-bottom:1px solid #6b2429}
+.net-bar.back{background:#0f2419;color:#9ff0c9;border-bottom:1px solid #1f5c3e}
+.net-dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex-shrink:0}
+.net-bar.offline .net-dot{animation:pulse 1.4s infinite}
+
+@keyframes slideDown{from{transform:translateY(-100%)}to{transform:none}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+.pwa-card{
+  position:fixed;z-index:61;right:24px;bottom:24px;width:min(370px,calc(100vw - 32px));
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  background:linear-gradient(145deg,#191919,#101010);
+  border:1px solid #333;border-radius:16px;padding:17px 19px;
+  box-shadow:0 20px 60px #000a;
+  animation:slideUp .3s ease;
+}
+@keyframes slideUp{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}
+
+.pwa-card div{flex:1;min-width:150px}
+.pwa-card strong{display:block;font-size:14px;margin-bottom:4px}
+.pwa-card span{display:block;color:var(--muted);font-size:12.5px;line-height:1.5}
+.pwa-card b{color:#ddd;font-weight:800}
+.pwa-card.update{border-color:#61300e;background:linear-gradient(145deg,#20150a,#130d06)}
+
+.pwa-icon{
+  flex:0 0 auto;width:42px;height:42px;border-radius:12px;
+  background:linear-gradient(145deg,var(--orange2),var(--orange));
+  display:grid;place-items:center;color:#111;font-weight:950;font-size:21px;
+  box-shadow:0 8px 22px #ff6a0033;
+}
+.pwa-actions{flex:0 0 auto;display:flex;gap:8px;width:100%;justify-content:flex-end}
+.btn.small{padding:9px 15px;font-size:13px;border-radius:9px}
+.btn.ghost{background:transparent;border-color:#3a3a3a;color:#bbb}
+.btn.ghost:hover{border-color:#666;color:#fff}
+
+/* a barra de conexão empurra o conteúdo para não cobrir o topo */
+body:has(.net-bar) .main{padding-top:64px}
+
+@media(max-width:900px){
+  .pwa-card{right:12px;left:12px;bottom:96px;width:auto}
+  body:has(.net-bar) .main{padding-top:58px}
+}
