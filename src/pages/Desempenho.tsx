@@ -243,7 +243,7 @@ export default function Desempenho() {
           {/* ---------- motivos ---------- */}
           <div className="panel card">
             <div className="card-head">
-              <h2>Objeções por sentimento</h2>
+              <h2>Qualificação do sentimento</h2>
               <span className="pill">{motivos.totalGeral} registradas</span>
             </div>
             <div className="reason-grid">
