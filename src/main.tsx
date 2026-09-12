@@ -9,6 +9,7 @@ import './styles/etapa3-append.css'
 import './styles/desempenho.css'
 import './styles/pwa.css'
 import './styles/cadastro.css'
+import './styles/funil-sentimento.css'
 
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
