@@ -8,6 +8,8 @@ import './styles/global.css'
 import './styles/etapa3-append.css'
 import './styles/desempenho.css'
 import './styles/pwa.css'
+import './styles/cadastro.css'
+
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
