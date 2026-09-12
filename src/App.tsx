@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Cadastros from './pages/Cadastros'
+import Lancamento from './pages/Lancamento'
 import EmBreve from './pages/EmBreve'
 import AppShell from './components/AppShell'
 import { ProtectedRoute } from './components/ProtectedRoute'
@@ -16,7 +17,7 @@ export default function App() {
           path="/app/lancamento"
           element={
             <ProtectedRoute>
-              <AppShell><EmBreve etapa={3} tela="Lançamento" /></AppShell>
+              <AppShell><Lancamento /></AppShell>
             </ProtectedRoute>
           }
         />
