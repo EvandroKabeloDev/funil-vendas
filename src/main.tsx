@@ -10,6 +10,7 @@ import './styles/desempenho.css'
 import './styles/pwa.css'
 import './styles/cadastro.css'
 import './styles/funil-sentimento.css'
+import './styles/campanhas.css'
 
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
