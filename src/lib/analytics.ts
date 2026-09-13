@@ -125,7 +125,7 @@ export function porCorretor(rows: EntryRow[]) {
   }).sort((a, b) => b.vendas - a.vendas || b.conversao - a.conversao)
 }
 
-/** Qualificação do sentimento por campanha. */
+/** Sentimento agregado por campanha. */
 export type CampanhaSentimento = {
   id: string
   nome: string
@@ -192,6 +192,29 @@ export function porMotivo(rows: EntryRow[]) {
   }
 }
 
+/** Observacoes escritas no lancamento, agrupadas por sentimento. */
+export type Observacao = {
+  data: string
+  corretor: string
+  campanha: string | null
+  texto: string
+}
+
+export function observacoesPorSentimento(rows: EntryRow[]) {
+  const pega = (campo: 'note_hot' | 'note_warm' | 'note_cold'): Observacao[] =>
+    rows
+      .filter(r => (r[campo] ?? '').trim().length > 0)
+      .map(r => ({
+        data: r.entry_date,
+        corretor: r.broker_name,
+        campanha: r.campaign_name,
+        texto: (r[campo] as string).trim()
+      }))
+      .sort((a, b) => b.data.localeCompare(a.data))
+
+  return { hot: pega('note_hot'), warm: pega('note_warm'), cold: pega('note_cold') }
+}
+
 export function serieDiaria(rows: EntryRow[], de: string, ate: string) {
   const mapa = new Map<string, { leads: number; vendas: number }>()
   for (const r of rows) {
@@ -199,12 +222,13 @@ export function serieDiaria(rows: EntryRow[], de: string, ate: string) {
     cur.leads += r.leads; cur.vendas += r.sales
     mapa.set(r.entry_date, cur)
   }
-  const out: { data: string; leads: number; vendas: number }[] = []
+  const out: { data: string; leads: number; vendas: number; conv: number }[] = []
   const cursor = new Date(de + 'T12:00:00')
   const fim = new Date(ate + 'T12:00:00')
   while (cursor <= fim) {
     const iso = cursor.toISOString().slice(0, 10)
-    out.push({ data: iso, ...(mapa.get(iso) ?? { leads: 0, vendas: 0 }) })
+    const v = mapa.get(iso) ?? { leads: 0, vendas: 0 }
+    out.push({ data: iso, ...v, conv: pct(v.vendas, v.leads) })
     cursor.setDate(cursor.getDate() + 1)
   }
   return out
@@ -213,4 +237,9 @@ export function serieDiaria(rows: EntryRow[], de: string, ate: string) {
 export const diaCurto = (iso: string) => {
   const [, m, d] = iso.split('-')
   return `${d}/${m}`
+}
+
+export const dataBR = (iso: string) => {
+  const [a, m, d] = iso.split('-')
+  return `${d}/${m}/${a.slice(2)}`
 }

@@ -4,27 +4,38 @@ import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../components/Toast'
 import { traduzErro, type Broker, type Team } from '../lib/types'
 import {
-  PERIODOS, composicaoLeads, diaCurto, intervalo, montarFunil, pct,
-  porCampanha, porCorretor, porMotivo, serieDiaria, soma,
-  type EntryRow, type Periodo
+  PERIODOS, composicaoLeads, dataBR, diaCurto, intervalo, montarFunil,
+  observacoesPorSentimento, pct, porCampanha, porCorretor, porMotivo,
+  serieDiaria, soma, type EntryRow, type Periodo
 } from '../lib/analytics'
+
+const FILTROS = 'funil:filtros-desempenho'
 
 export default function Desempenho() {
   const { isGestor } = useAuth()
   const toast = useToast()
 
+  // filtros persistidos: sobrevivem à aba descartada pelo iOS
+  const salvos = (() => {
+    try { return JSON.parse(sessionStorage.getItem(FILTROS) ?? '{}') } catch { return {} }
+  })()
+
   const [rows, setRows] = useState<EntryRow[]>([])
   const [teams, setTeams] = useState<Team[]>([])
   const [brokers, setBrokers] = useState<Broker[]>([])
-  const [periodo, setPeriodo] = useState<Periodo>('30')
-  const [teamId, setTeamId] = useState('')
-  const [brokerId, setBrokerId] = useState('')
+  const [periodo, setPeriodo] = useState<Periodo>(salvos.periodo ?? '30')
+  const [teamId, setTeamId] = useState(salvos.teamId ?? '')
+  const [brokerId, setBrokerId] = useState(salvos.brokerId ?? '')
   const [loading, setLoading] = useState(true)
 
   const [de, ate] = useMemo(() => intervalo(periodo), [periodo])
 
   useEffect(() => {
-    if (!isGestor) return // corretor não tem filtros de equipe/corretor
+    sessionStorage.setItem(FILTROS, JSON.stringify({ periodo, teamId, brokerId }))
+  }, [periodo, teamId, brokerId])
+
+  useEffect(() => {
+    if (!isGestor) return
     ;(async () => {
       const [t, b] = await Promise.all([
         supabase.from('teams').select('id, org_id, name, is_active').order('name'),
@@ -43,7 +54,6 @@ export default function Desempenho() {
       .gte('entry_date', de)
       .lte('entry_date', ate)
       .order('entry_date')
-
     if (isGestor && teamId) q = q.eq('team_id', teamId)
     if (isGestor && brokerId) q = q.eq('broker_id', brokerId)
 
@@ -67,6 +77,7 @@ export default function Desempenho() {
   const ranking = useMemo(() => porCorretor(rows), [rows])
   const campanhas = useMemo(() => porCampanha(rows), [rows])
   const motivos = useMemo(() => porMotivo(rows), [rows])
+  const obs = useMemo(() => observacoesPorSentimento(rows), [rows])
   const serie = useMemo(() => serieDiaria(rows, de, ate), [rows, de, ate])
 
   const totLeads = soma(rows, 'leads')
@@ -257,7 +268,7 @@ export default function Desempenho() {
             </div>
           </div>
 
-          {/* ---------- evolucao diaria ---------- */}
+          {/* ---------- evolução diária ---------- */}
           <div className="panel card">
             <div className="card-head">
               <h2>Evolução diária</h2>
@@ -266,17 +277,23 @@ export default function Desempenho() {
                 <span><i className="dot green" />Vendas</span>
               </div>
             </div>
-            <div className="spark">
-              {serie.map(s => (
-                <div className="spark-col" key={s.data} title={`${diaCurto(s.data)} — ${s.leads} leads, ${s.vendas} vendas`}>
-                  <div className="spark-bars">
-                    <div className="sb leads" style={{ height: `${(s.leads / maxSerie) * 100}%` }} />
-                    <div className="sb vendas" style={{ height: `${(s.vendas / maxSerie) * 100}%` }} />
+            <div className="spark-scroll">
+              <div className="spark" style={{ minWidth: `${serie.length * 34}px` }}>
+                {serie.map(s => (
+                  <div className="spark-col" key={s.data}
+                    title={`${diaCurto(s.data)} — ${s.leads} leads, ${s.vendas} vendas (${s.conv}%)`}>
+                    <div className="spark-bars">
+                      <div className="sb leads" style={{ height: `${(s.leads / maxSerie) * 100}%` }}>
+                        {s.leads > 0 && s.conv > 0 && <b className="sb-conv">{s.conv}%</b>}
+                      </div>
+                      <div className="sb vendas" style={{ height: `${(s.vendas / maxSerie) * 100}%` }} />
+                    </div>
+                    <span className="spark-x">{diaCurto(s.data)}</span>
                   </div>
-                  <span className="spark-x">{diaCurto(s.data)}</span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
+            <p className="hint-block">O percentual dentro da barra é a conversão de leads em vendas no dia.</p>
           </div>
 
           {/* ---------- qualificação do sentimento ---------- */}
@@ -286,25 +303,51 @@ export default function Desempenho() {
               <span className="pill">{motivos.totalGeral} registradas</span>
             </div>
             <div className="reason-grid">
-              {motivos.grupos.map(g => (
-                <div className="reason-card" key={g.key} style={{ borderTopColor: g.cor }}>
-                  <div className="rc-head">
-                    <strong style={{ color: g.cor }}>{g.label}</strong>
-                    <span>{g.total} leads</span>
-                  </div>
-                  {g.itens.map(it => (
-                    <div className="rc-item" key={it.label}>
-                      <div className="rc-top">
-                        <span>{it.label}</span>
-                        <strong>{it.valor}</strong>
-                      </div>
-                      <div className="rc-track">
-                        <div className="rc-fill" style={{ width: `${it.pct}%`, background: g.cor }} />
-                      </div>
+              {motivos.grupos.map(g => {
+                const notas = obs[g.key as 'hot' | 'warm' | 'cold']
+                return (
+                  <div className="reason-card" key={g.key} style={{ borderTopColor: g.cor }}>
+                    <div className="rc-head">
+                      <strong style={{ color: g.cor }}>{g.label}</strong>
+                      <span>{g.total} leads</span>
                     </div>
-                  ))}
-                </div>
-              ))}
+                    {g.itens.map(it => (
+                      <div className="rc-item" key={it.label}>
+                        <div className="rc-top">
+                          <span>{it.label}</span>
+                          <strong>{it.valor}</strong>
+                        </div>
+                        <div className="rc-track">
+                          <div className="rc-fill" style={{ width: `${it.pct}%`, background: g.cor }} />
+                        </div>
+                      </div>
+                    ))}
+
+                    <div className="obs-bloco">
+                      <div className="obs-titulo">
+                        Observações <span className="obs-count">{notas.length}</span>
+                      </div>
+                      {notas.length === 0 ? (
+                        <p className="obs-vazio">Nenhuma observação registrada no período.</p>
+                      ) : (
+                        <div className="obs-list">
+                          {notas.map((n, i) => (
+                            <div className="obs-item" key={i}>
+                              <div className="obs-meta">
+                                <span>{dataBR(n.data)}</span>
+                                <span>·</span>
+                                <span>{n.corretor}</span>
+                                {n.campanha && <><span>·</span><span className="obs-camp">{n.campanha}</span></>}
+                              </div>
+                              <p>{n.texto}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
 

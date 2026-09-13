@@ -1,13 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 import { useToast } from '../components/Toast'
+import NumberInput from '../components/NumberInput'
 import { traduzErro, type Broker, type Campaign } from '../lib/types'
 import {
   ETAPAS_FUNIL, FORM_VAZIO, MOTIVOS, SENTIMENTOS,
-  alertasSuaves, amanhaISO, formatarData, hojeISO, toInt, validar,
+  alertasSuaves, amanhaISO, formatarData, hojeISO, validar,
   type EntryForm
 } from '../lib/entry'
+
+const RASCUNHO = 'funil:rascunho'
 
 export default function Lancamento() {
   const { profile, isGestor } = useAuth()
@@ -22,6 +25,8 @@ export default function Lancamento() {
   const [entryId, setEntryId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [rascunhoRecuperado, setRascunhoRecuperado] = useState(false)
+  const tocado = useRef(false)
 
   // ---------- corretores e campanhas ----------
   useEffect(() => {
@@ -39,6 +44,7 @@ export default function Lancamento() {
           .from('campaigns')
           .select('id, org_id, name, is_active, created_by, created_at')
           .eq('is_active', true)
+          .eq('created_by', profile!.id)   // cada um lança com as próprias campanhas
           .order('name')
       ])
 
@@ -51,7 +57,7 @@ export default function Lancamento() {
     })()
   }, [isGestor, profile, toast])
 
-  // ---------- carrega o lancamento do dia ----------
+  // ---------- carrega o dia ----------
   const carregarDia = useCallback(async () => {
     if (!brokerId || !data) return
     setBusy(true)
@@ -62,9 +68,24 @@ export default function Lancamento() {
       .eq('entry_date', data)
       .maybeSingle()
     setBusy(false)
-
     if (error) { toast(traduzErro(error), 'error'); return }
 
+    // rascunho tem prioridade sobre o banco (aba descartada no iOS)
+    const bruto = sessionStorage.getItem(RASCUNHO)
+    if (bruto) {
+      try {
+        const r = JSON.parse(bruto)
+        if (r.brokerId === brokerId && r.data === data) {
+          setEntryId(row?.id ?? null)
+          setCampaignId(r.campaignId ?? '')
+          setForm(r.form)
+          setRascunhoRecuperado(true)
+          return
+        }
+      } catch { /* rascunho inválido, segue com o banco */ }
+    }
+
+    setRascunhoRecuperado(false)
     if (row) {
       const {
         id, org_id, broker_id, entry_date, created_by, created_at, updated_at,
@@ -73,23 +94,28 @@ export default function Lancamento() {
       setEntryId(id)
       setCampaignId(campaign_id ?? '')
       setForm({
-        ...FORM_VAZIO,
-        ...campos,
+        ...FORM_VAZIO, ...campos,
         note_hot: campos.note_hot ?? '',
         note_warm: campos.note_warm ?? '',
         note_cold: campos.note_cold ?? ''
       })
     } else {
-      setEntryId(null)
-      setCampaignId('')
-      setForm(FORM_VAZIO)
+      setEntryId(null); setCampaignId(''); setForm(FORM_VAZIO)
     }
   }, [brokerId, data, toast])
 
   useEffect(() => { carregarDia() }, [carregarDia])
 
-  const set = (campo: keyof EntryForm, valor: number | string) =>
+  // ---------- rascunho automático ----------
+  useEffect(() => {
+    if (!tocado.current || !brokerId) return
+    sessionStorage.setItem(RASCUNHO, JSON.stringify({ brokerId, data, campaignId, form }))
+  }, [form, campaignId, brokerId, data])
+
+  const set = (campo: keyof EntryForm, valor: number | string) => {
+    tocado.current = true
     setForm(f => ({ ...f, [campo]: valor }))
+  }
 
   const erros = useMemo(() => validar(form), [form])
   const avisos = useMemo(() => alertasSuaves(form), [form])
@@ -114,6 +140,9 @@ export default function Lancamento() {
       .upsert(payload, { onConflict: 'broker_id,entry_date' })
     setBusy(false)
     if (error) return toast(traduzErro(error), 'error')
+    sessionStorage.removeItem(RASCUNHO)
+    tocado.current = false
+    setRascunhoRecuperado(false)
     toast(entryId ? 'Lançamento atualizado.' : 'Lançamento salvo.')
     carregarDia()
   }
@@ -125,10 +154,16 @@ export default function Lancamento() {
     const { error } = await supabase.from('funnel_entries').delete().eq('id', entryId)
     setBusy(false)
     if (error) return toast(traduzErro(error), 'error')
+    sessionStorage.removeItem(RASCUNHO)
     toast('Lançamento excluído.')
-    setEntryId(null)
-    setForm(FORM_VAZIO)
-    setCampaignId('')
+    setEntryId(null); setForm(FORM_VAZIO); setCampaignId('')
+  }
+
+  function descartarRascunho() {
+    sessionStorage.removeItem(RASCUNHO)
+    tocado.current = false
+    setRascunhoRecuperado(false)
+    carregarDia()
   }
 
   if (loading) return <div className="panel card"><div className="empty">Carregando…</div></div>
@@ -145,6 +180,14 @@ export default function Lancamento() {
 
   return (
     <>
+      {rascunhoRecuperado && (
+        <div className="panel card msg-box warn-box">
+          <strong>Rascunho recuperado</strong>
+          <ul><li>Recuperamos o que você estava digitando antes da tela apagar. Confira e salve.</li></ul>
+          <button className="btn small ghost" onClick={descartarRascunho}>Descartar rascunho</button>
+        </div>
+      )}
+
       {/* ---------- contexto ---------- */}
       <div className="panel card ctx-bar">
         <div className="field">
@@ -167,17 +210,13 @@ export default function Lancamento() {
       <div className="panel card">
         <div className="card-head com-campanha">
           <h2>Leads recebidos</h2>
-
           <div className="head-campanha">
             <label htmlFor="campanha">Campanha</label>
-            <select id="campanha" value={campaignId} onChange={e => setCampaignId(e.target.value)}>
-              <option value="">
-                {campanhas.length ? 'Sem campanha' : 'Nenhuma campanha cadastrada'}
-              </option>
+            <select id="campanha" value={campaignId} onChange={e => { tocado.current = true; setCampaignId(e.target.value) }}>
+              <option value="">{campanhas.length ? 'Sem campanha' : 'Nenhuma campanha cadastrada'}</option>
               {campanhas.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
-
           <span className={`pill ${restante === 0 ? 'ok' : 'alert'}`}>
             {restante === 0 ? 'Classificação completa' : `Faltam ${restante > 0 ? restante : 0}`}
           </span>
@@ -185,8 +224,8 @@ export default function Lancamento() {
 
         <div className="big-field">
           <label htmlFor="leads">Total de leads do dia</label>
-          <input id="leads" inputMode="numeric" className="big-input"
-            value={form.leads} onChange={e => set('leads', toInt(e.target.value))} />
+          <NumberInput id="leads" className="big-input" value={form.leads}
+            onChange={v => set('leads', v)} ariaLabel="Total de leads do dia" />
         </div>
 
         <div className="sent-grid">
@@ -199,9 +238,8 @@ export default function Lancamento() {
                     <strong style={{ color: s.cor }}>{s.label}</strong>
                     <small>{s.desc}</small>
                   </div>
-                  <input inputMode="numeric" className="sent-input"
-                    value={total} onChange={e => set(s.key, toInt(e.target.value))}
-                    aria-label={`Total de leads ${s.label}`} />
+                  <NumberInput className="sent-input" value={total}
+                    onChange={v => set(s.key, v)} ariaLabel={`Total de leads ${s.label}`} />
                 </div>
 
                 <div className="reason-row">
@@ -211,8 +249,8 @@ export default function Lancamento() {
                     return (
                       <div className="reason" key={m.suf}>
                         <label>{m.label}</label>
-                        <input inputMode="numeric" className={v > total ? 'invalid' : ''}
-                          value={v} onChange={e => set(campo, toInt(e.target.value))} />
+                        <NumberInput value={v} onChange={n => set(campo, n)}
+                          invalid={v > total} ariaLabel={`${m.label} em ${s.label}`} />
                       </div>
                     )
                   })}
@@ -235,16 +273,15 @@ export default function Lancamento() {
           {ETAPAS_FUNIL.map(et => (
             <div className="funnel-item" key={et.key}>
               <label htmlFor={et.key}>{et.label}</label>
-              <input id={et.key} inputMode="numeric"
-                value={form[et.key] as number}
-                onChange={e => set(et.key as keyof EntryForm, toInt(e.target.value))} />
+              <NumberInput id={et.key} value={form[et.key] as number}
+                onChange={v => set(et.key as keyof EntryForm, v)} ariaLabel={et.label} />
               <small>{et.desc}</small>
             </div>
           ))}
         </div>
       </div>
 
-      {/* ---------- validacao ---------- */}
+      {/* ---------- validação ---------- */}
       {erros.length > 0 && (
         <div className="panel card msg-box error">
           <strong>Ajuste antes de salvar</strong>

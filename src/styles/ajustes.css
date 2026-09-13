@@ -1,0 +1,87 @@
+/* =====================================================================
+   ETAPA 10 — ajustes: overflow, setas, observações, conversão diária
+   ===================================================================== */
+
+/* ---------- 1. impede a página inteira de esticar (90 dias) ---------- */
+html,body{max-width:100%;overflow-x:hidden}
+.shell{min-width:0}
+.main{min-width:0;max-width:100%;overflow-x:hidden}
+.panel,.card{min-width:0;max-width:100%}
+
+/* o gráfico rola dentro da própria caixa, sem empurrar o layout */
+.spark-scroll{
+  width:100%;max-width:100%;overflow-x:auto;overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;padding-bottom:6px;
+}
+.spark-scroll::-webkit-scrollbar{height:7px}
+.spark-scroll::-webkit-scrollbar-thumb{background:#333;border-radius:99px}
+.spark{height:200px;overflow:visible}
+.spark-col{min-width:0}
+
+/* ---------- 2. conversão dentro da barra de leads ---------- */
+.sb{position:relative}
+.sb-conv{
+  position:absolute;top:3px;left:50%;transform:translateX(-50%);
+  font-size:9px;font-weight:900;color:#111;white-space:nowrap;
+}
+
+/* ---------- 3. campos numéricos com setas ---------- */
+.num-wrap{position:relative;display:block;width:100%}
+.num-input{
+  width:100%;height:42px;border:1px solid var(--line);border-radius:9px;
+  background:#111;color:#fff;text-align:center;font-size:16px;font-weight:700;
+  outline:none;padding:0 22px 0 6px;
+}
+.num-input:focus{border-color:var(--orange)}
+.num-wrap.invalid .num-input{border-color:var(--danger);background:#1e0c0d}
+
+.num-steps{
+  position:absolute;right:4px;top:50%;transform:translateY(-50%);
+  display:flex;flex-direction:column;gap:2px;
+}
+.num-steps button{
+  width:20px;height:16px;border:0;border-radius:4px;background:#242424;color:#aaa;
+  font-size:9px;line-height:1;display:grid;place-items:center;padding:0;
+}
+.num-steps button:hover{background:var(--orange);color:#111}
+.num-steps button:active{transform:scale(.92)}
+
+/* variações por contexto */
+.num-input.big-input{
+  height:76px;font-size:40px;font-weight:900;border-radius:14px;
+  text-align:left;padding:0 62px 0 20px;background:#0b0b0b;
+}
+.num-wrap:has(.big-input) .num-steps{right:14px;gap:4px}
+.num-wrap:has(.big-input) .num-steps button{width:34px;height:26px;font-size:12px}
+
+.num-input.sent-input{height:52px;font-size:23px;font-weight:850;border-radius:11px;padding:0 24px 0 6px}
+.sent-head .num-wrap{width:92px;flex-shrink:0}
+
+.funnel-item .num-input{height:56px;font-size:24px;font-weight:850;border-radius:10px;padding:0 24px 0 6px}
+
+/* ---------- 4. observações na qualificação ---------- */
+.obs-bloco{margin-top:15px;padding-top:14px;border-top:1px solid #1f1f1f}
+.obs-titulo{
+  display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;
+  color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;
+}
+.obs-count{
+  background:#1e1e1e;color:#bbb;border-radius:99px;padding:2px 7px;
+  font-size:10px;letter-spacing:0;
+}
+.obs-vazio{color:#666;font-size:12px;margin:0;font-style:italic}
+.obs-list{display:grid;gap:8px;max-height:230px;overflow-y:auto;padding-right:4px}
+.obs-list::-webkit-scrollbar{width:5px}
+.obs-list::-webkit-scrollbar-thumb{background:#333;border-radius:99px}
+.obs-item{background:#111;border:1px solid #222;border-radius:9px;padding:9px 11px}
+.obs-meta{
+  display:flex;flex-wrap:wrap;gap:5px;align-items:center;
+  font-size:10px;color:#777;margin-bottom:5px;
+}
+.obs-camp{color:var(--orange2);font-weight:700}
+.obs-item p{margin:0;font-size:13px;line-height:1.5;color:#ddd;word-break:break-word}
+
+@media(max-width:900px){
+  .num-input.big-input{height:66px;font-size:33px}
+  .obs-list{max-height:190px}
+}

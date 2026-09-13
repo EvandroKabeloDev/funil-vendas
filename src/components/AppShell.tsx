@@ -5,7 +5,7 @@ import { useAuth } from '../lib/AuthContext'
 const META: Record<string, [string, string]> = {
   '/app/lancamento': ['Controle diário', 'Lançamento do funil'],
   '/app/desempenho': ['Análise da equipe', 'Desempenho comercial'],
-  '/app/campanhas':  ['Origem dos leads', 'Campanhas'],
+  '/app/campanhas':  ['Origem dos leads', 'Minhas campanhas'],
   '/app/cadastros':  ['Configuração', 'Equipes e corretores']
 }
 
@@ -35,9 +35,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <NavLink to="/app/desempenho" className="nav-btn">
             <span className="nav-icon">▥</span>Desempenho
           </NavLink>
-          <NavLink to="/app/campanhas" className="nav-btn">
-            <span className="nav-icon">◎</span>Campanhas
-          </NavLink>
+          {/* campanhas são pessoais do corretor; o gestor apenas as visualiza no Desempenho */}
+          {!isGestor && (
+            <NavLink to="/app/campanhas" className="nav-btn">
+              <span className="nav-icon">◎</span>Campanhas
+            </NavLink>
+          )}
           {isGestor && (
             <NavLink to="/app/cadastros" className="nav-btn">
               <span className="nav-icon">⚙</span>Cadastros
@@ -57,10 +60,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
             <div className="eyebrow">{eyebrow}</div>
             <h1>{title}</h1>
           </div>
-
           <div className="today">{today}</div>
-
-          {/* visível apenas no celular: identidade + sair */}
           <div className="user-mobile">
             <div className="avatar" aria-hidden="true">{iniciais}</div>
             <div className="user-info">
