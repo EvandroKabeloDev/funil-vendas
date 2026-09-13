@@ -12,6 +12,7 @@ import './styles/cadastro.css'
 import './styles/funil-sentimento.css'
 import './styles/campanhas.css'
 import './styles/correcoes.css'
+import './styles/ajustes.css'
 
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
