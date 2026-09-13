@@ -18,6 +18,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
     weekday: 'long', day: '2-digit', month: 'long'
   })
 
+  const iniciais = (profile?.full_name ?? '?')
+    .split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase()
+
   return (
     <div className="shell">
       <aside className="sidebar">
@@ -50,11 +53,22 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
       <main className="main">
         <header className="topbar">
-          <div>
+          <div className="topbar-titulo">
             <div className="eyebrow">{eyebrow}</div>
             <h1>{title}</h1>
           </div>
+
           <div className="today">{today}</div>
+
+          {/* visível apenas no celular: identidade + sair */}
+          <div className="user-mobile">
+            <div className="avatar" aria-hidden="true">{iniciais}</div>
+            <div className="user-info">
+              <strong>{profile?.full_name}</strong>
+              <span className="role-tag">{isGestor ? 'Gestor' : 'Corretor'}</span>
+            </div>
+            <button className="btn sair" onClick={signOut}>Sair</button>
+          </div>
         </header>
         {children}
       </main>

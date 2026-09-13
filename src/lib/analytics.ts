@@ -1,7 +1,6 @@
 // =====================================================================
 // Agregacoes da tela de Desempenho.
-// Le de public.vw_funnel_entries (ja traz broker_name / team_name).
-// Nenhuma dependencia externa: os graficos sao SVG/CSS puros.
+// Le de public.vw_funnel_entries (broker_name / team_name / campaign_name).
 // =====================================================================
 
 export type EntryRow = {
@@ -10,6 +9,8 @@ export type EntryRow = {
   broker_name: string
   team_id: string
   team_name: string
+  campaign_id: string | null
+  campaign_name: string | null
   entry_date: string
   leads: number
   hot: number; warm: number; cold: number
@@ -30,23 +31,18 @@ export type EntryRow = {
 export type Periodo = '7' | '30' | '90' | 'mes'
 
 export const PERIODOS: { key: Periodo; label: string }[] = [
-  { key: '7',   label: '7 dias'     },
-  { key: '30',  label: '30 dias'    },
-  { key: '90',  label: '90 dias'    },
-  { key: 'mes', label: 'Este mês'   }
+  { key: '7',   label: '7 dias'   },
+  { key: '30',  label: '30 dias'  },
+  { key: '90',  label: '90 dias'  },
+  { key: 'mes', label: 'Este mês' }
 ]
 
-/** Converte o periodo escolhido em [dataInicial, dataFinal] no formato ISO. */
 export function intervalo(p: Periodo): [string, string] {
   const hoje = new Date()
   const fim = new Date(hoje)
   let ini: Date
-  if (p === 'mes') {
-    ini = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
-  } else {
-    ini = new Date(hoje)
-    ini.setDate(ini.getDate() - (Number(p) - 1))
-  }
+  if (p === 'mes') ini = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
+  else { ini = new Date(hoje); ini.setDate(ini.getDate() - (Number(p) - 1)) }
   const iso = (d: Date) => {
     const c = new Date(d)
     c.setMinutes(c.getMinutes() - c.getTimezoneOffset())
@@ -58,34 +54,33 @@ export function intervalo(p: Periodo): [string, string] {
 export const soma = (rows: EntryRow[], campo: keyof EntryRow): number =>
   rows.reduce((acc, r) => acc + (Number(r[campo]) || 0), 0)
 
-/** Percentual seguro contra divisao por zero. */
 export const pct = (parte: number, total: number): number =>
   total > 0 ? Math.round((parte / total) * 1000) / 10 : 0
 
 export const ETAPAS_FUNIL_VIS = [
-  { key: 'leads',         label: 'Leads'          },
-  { key: 'appointments',  label: 'Agendamentos'   },
-  { key: 'attendance',    label: 'Comparecimento' },
-  { key: 'proposals',     label: 'Propostas'      },
-  { key: 'contracts',     label: 'Contratos'      },
-  { key: 'sales',         label: 'Vendas'         }
+  { key: 'leads',        label: 'Leads'          },
+  { key: 'appointments', label: 'Agendamentos'   },
+  { key: 'attendance',   label: 'Comparecimento' },
+  { key: 'proposals',    label: 'Propostas'      },
+  { key: 'contracts',    label: 'Contratos'      },
+  { key: 'sales',        label: 'Vendas'         }
 ] as const
 
-/** Composicao da barra de Leads por temperatura (frio -> morno -> quente). */
 export type FatiaSentimento = {
-  key: 'cold' | 'warm' | 'hot'
+  key: 'hot' | 'warm' | 'cold'
   label: string
   valor: number
   pct: number
   cor: string
 }
 
+/** Composicao da barra de Leads — ordem: Quente, Morno, Frio. */
 export function composicaoLeads(rows: EntryRow[]): FatiaSentimento[] {
   const leads = soma(rows, 'leads')
   const defs = [
-    { key: 'cold' as const, label: 'Frio',   cor: 'var(--blue)'   },
+    { key: 'hot'  as const, label: 'Quente', cor: 'var(--danger)' },
     { key: 'warm' as const, label: 'Morno',  cor: 'var(--yellow)' },
-    { key: 'hot'  as const, label: 'Quente', cor: 'var(--danger)' }
+    { key: 'cold' as const, label: 'Frio',   cor: 'var(--blue)'   }
   ]
   return defs.map(d => {
     const valor = soma(rows, d.key)
@@ -93,7 +88,6 @@ export function composicaoLeads(rows: EntryRow[]): FatiaSentimento[] {
   })
 }
 
-/** Funil com conversao acumulada (vs. leads) e etapa a etapa. */
 export function montarFunil(rows: EntryRow[]) {
   const base = soma(rows, 'leads')
   return ETAPAS_FUNIL_VIS.map((et, i) => {
@@ -109,35 +103,66 @@ export function montarFunil(rows: EntryRow[]) {
   })
 }
 
-/** Ranking por corretor, ordenado por vendas e depois por taxa de conversao. */
 export function porCorretor(rows: EntryRow[]) {
   const mapa = new Map<string, EntryRow[]>()
   for (const r of rows) {
     const arr = mapa.get(r.broker_id) ?? []
-    arr.push(r)
-    mapa.set(r.broker_id, arr)
+    arr.push(r); mapa.set(r.broker_id, arr)
   }
-  return [...mapa.entries()]
-    .map(([id, rs]) => {
-      const leads = soma(rs, 'leads')
-      const sales = soma(rs, 'sales')
-      return {
-        id,
-        nome: rs[0].broker_name,
-        equipe: rs[0].team_name,
-        leads,
-        agendamentos: soma(rs, 'appointments'),
-        propostas: soma(rs, 'proposals'),
-        contratos: soma(rs, 'contracts'),
-        vendas: sales,
-        conversao: pct(sales, leads),
-        dias: new Set(rs.map(r => r.entry_date)).size
-      }
-    })
-    .sort((a, b) => b.vendas - a.vendas || b.conversao - a.conversao)
+  return [...mapa.entries()].map(([id, rs]) => {
+    const leads = soma(rs, 'leads')
+    const sales = soma(rs, 'sales')
+    return {
+      id, nome: rs[0].broker_name, equipe: rs[0].team_name,
+      leads,
+      agendamentos: soma(rs, 'appointments'),
+      propostas: soma(rs, 'proposals'),
+      contratos: soma(rs, 'contracts'),
+      vendas: sales,
+      conversao: pct(sales, leads),
+      dias: new Set(rs.map(r => r.entry_date)).size
+    }
+  }).sort((a, b) => b.vendas - a.vendas || b.conversao - a.conversao)
 }
 
-/** Motivos de objecao somados e agrupados por sentimento. */
+/** Qualificação do sentimento por campanha. */
+export type CampanhaSentimento = {
+  id: string
+  nome: string
+  leads: number
+  hot: number; warm: number; cold: number
+  pctHot: number; pctWarm: number; pctCold: number
+  vendas: number
+  conversao: number
+}
+
+export function porCampanha(rows: EntryRow[]): CampanhaSentimento[] {
+  const mapa = new Map<string, EntryRow[]>()
+  for (const r of rows) {
+    const k = r.campaign_id ?? '__sem__'
+    const arr = mapa.get(k) ?? []
+    arr.push(r); mapa.set(k, arr)
+  }
+  return [...mapa.entries()].map(([id, rs]) => {
+    const leads = soma(rs, 'leads')
+    const hot = soma(rs, 'hot')
+    const warm = soma(rs, 'warm')
+    const cold = soma(rs, 'cold')
+    const vendas = soma(rs, 'sales')
+    return {
+      id,
+      nome: id === '__sem__' ? 'Sem campanha' : (rs[0].campaign_name ?? 'Campanha removida'),
+      leads, hot, warm, cold,
+      pctHot: pct(hot, leads),
+      pctWarm: pct(warm, leads),
+      pctCold: pct(cold, leads),
+      vendas,
+      conversao: pct(vendas, leads)
+    }
+  }).sort((a, b) => b.leads - a.leads)
+}
+
+/** Motivos de objecao — ordem: Quente, Morno, Frio. */
 export function porMotivo(rows: EntryRow[]) {
   const sent = [
     { key: 'hot',  label: 'Quente', cor: 'var(--danger)' },
@@ -167,13 +192,11 @@ export function porMotivo(rows: EntryRow[]) {
   }
 }
 
-/** Serie diaria para o grafico de linha (leads x vendas). */
 export function serieDiaria(rows: EntryRow[], de: string, ate: string) {
   const mapa = new Map<string, { leads: number; vendas: number }>()
   for (const r of rows) {
     const cur = mapa.get(r.entry_date) ?? { leads: 0, vendas: 0 }
-    cur.leads += r.leads
-    cur.vendas += r.sales
+    cur.leads += r.leads; cur.vendas += r.sales
     mapa.set(r.entry_date, cur)
   }
   const out: { data: string; leads: number; vendas: number }[] = []
@@ -181,8 +204,7 @@ export function serieDiaria(rows: EntryRow[], de: string, ate: string) {
   const fim = new Date(ate + 'T12:00:00')
   while (cursor <= fim) {
     const iso = cursor.toISOString().slice(0, 10)
-    const v = mapa.get(iso) ?? { leads: 0, vendas: 0 }
-    out.push({ data: iso, ...v })
+    out.push({ data: iso, ...(mapa.get(iso) ?? { leads: 0, vendas: 0 }) })
     cursor.setDate(cursor.getDate() + 1)
   }
   return out

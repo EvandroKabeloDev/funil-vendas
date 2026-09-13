@@ -5,7 +5,8 @@ import { useToast } from '../components/Toast'
 import { traduzErro, type Broker, type Team } from '../lib/types'
 import {
   PERIODOS, composicaoLeads, diaCurto, intervalo, montarFunil, pct,
-  porCorretor, porMotivo, serieDiaria, soma, type EntryRow, type Periodo
+  porCampanha, porCorretor, porMotivo, serieDiaria, soma,
+  type EntryRow, type Periodo
 } from '../lib/analytics'
 
 export default function Desempenho() {
@@ -23,7 +24,8 @@ export default function Desempenho() {
   const [de, ate] = useMemo(() => intervalo(periodo), [periodo])
 
   useEffect(() => {
-    (async () => {
+    if (!isGestor) return // corretor não tem filtros de equipe/corretor
+    ;(async () => {
       const [t, b] = await Promise.all([
         supabase.from('teams').select('id, org_id, name, is_active').order('name'),
         supabase.from('brokers').select('id, org_id, team_id, profile_id, name, is_active').order('name')
@@ -31,7 +33,7 @@ export default function Desempenho() {
       setTeams((t.data ?? []) as Team[])
       setBrokers((b.data ?? []) as Broker[])
     })()
-  }, [])
+  }, [isGestor])
 
   const carregar = useCallback(async () => {
     setLoading(true)
@@ -42,14 +44,14 @@ export default function Desempenho() {
       .lte('entry_date', ate)
       .order('entry_date')
 
-    if (teamId) q = q.eq('team_id', teamId)
-    if (brokerId) q = q.eq('broker_id', brokerId)
+    if (isGestor && teamId) q = q.eq('team_id', teamId)
+    if (isGestor && brokerId) q = q.eq('broker_id', brokerId)
 
     const { data, error } = await q
     if (error) toast(traduzErro(error), 'error')
     setRows((data ?? []) as EntryRow[])
     setLoading(false)
-  }, [de, ate, teamId, brokerId, toast])
+  }, [de, ate, teamId, brokerId, isGestor, toast])
 
   useEffect(() => { carregar() }, [carregar])
 
@@ -63,6 +65,7 @@ export default function Desempenho() {
   const funil = useMemo(() => montarFunil(rows), [rows])
   const composicao = useMemo(() => composicaoLeads(rows), [rows])
   const ranking = useMemo(() => porCorretor(rows), [rows])
+  const campanhas = useMemo(() => porCampanha(rows), [rows])
   const motivos = useMemo(() => porMotivo(rows), [rows])
   const serie = useMemo(() => serieDiaria(rows, de, ate), [rows, de, ate])
 
@@ -74,7 +77,6 @@ export default function Desempenho() {
   const brokersFiltrados = teamId ? brokers.filter(b => b.team_id === teamId) : brokers
   const maxSerie = Math.max(...serie.map(s => s.leads), 1)
 
-  // leads lançados sem classificação de temperatura
   const classificados = composicao.reduce((t, f) => t + f.valor, 0)
   const semClassificar = Math.max(totLeads - classificados, 0)
 
@@ -164,24 +166,18 @@ export default function Desempenho() {
                   <div className="fc-label">{f.label}</div>
                   <div className="fc-track">
                     {f.key === 'leads' ? (
-                      // Barra de Leads: segmentada pela temperatura dos leads
                       <div className="fc-bar segmentado" style={{ width: `${f.largura}%` }}>
                         {composicao.map(s => s.valor > 0 && (
-                          <div
-                            key={s.key}
-                            className="fc-seg"
+                          <div key={s.key} className="fc-seg"
                             style={{ width: `${pct(s.valor, classificados || 1)}%`, background: s.cor }}
-                            title={`${s.label}: ${s.valor} lead(s) — ${s.pct}%`}
-                          >
+                            title={`${s.label}: ${s.valor} lead(s) — ${s.pct}%`}>
                             {s.pct >= 8 && <span>{s.pct}%</span>}
                           </div>
                         ))}
                         {semClassificar > 0 && (
-                          <div
-                            className="fc-seg vazio"
+                          <div className="fc-seg vazio"
                             style={{ width: `${pct(semClassificar, classificados || 1)}%` }}
-                            title={`Sem classificação: ${semClassificar} lead(s)`}
-                          />
+                            title={`Sem classificação: ${semClassificar} lead(s)`} />
                         )}
                       </div>
                     ) : (
@@ -199,7 +195,6 @@ export default function Desempenho() {
               ))}
             </div>
 
-            {/* resumo numérico da composição */}
             <div className="sent-summary">
               {composicao.map(s => (
                 <div className="ss-item" key={s.key}>
@@ -215,6 +210,50 @@ export default function Desempenho() {
                   <span>{semClassificar} <small>({pct(semClassificar, totLeads)}%)</small></span>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* ---------- sentimento por campanha ---------- */}
+          <div className="panel card">
+            <div className="card-head">
+              <h2>Sentimento por campanha</h2>
+              <span className="pill">{campanhas.length}</span>
+            </div>
+            <div className="camp-list">
+              {campanhas.map(c => (
+                <div className="camp-item" key={c.id}>
+                  <div className="camp-head">
+                    <strong>{c.nome}</strong>
+                    <span className="camp-total">{c.leads} lead(s)</span>
+                  </div>
+                  <div className="camp-bar">
+                    {c.hot > 0 && (
+                      <div className="cb-seg" style={{ width: `${c.pctHot}%`, background: 'var(--danger)' }}
+                        title={`Quente: ${c.hot} (${c.pctHot}%)`}>
+                        {c.pctHot >= 10 && <span>{c.pctHot}%</span>}
+                      </div>
+                    )}
+                    {c.warm > 0 && (
+                      <div className="cb-seg" style={{ width: `${c.pctWarm}%`, background: 'var(--yellow)' }}
+                        title={`Morno: ${c.warm} (${c.pctWarm}%)`}>
+                        {c.pctWarm >= 10 && <span>{c.pctWarm}%</span>}
+                      </div>
+                    )}
+                    {c.cold > 0 && (
+                      <div className="cb-seg" style={{ width: `${c.pctCold}%`, background: 'var(--blue)' }}
+                        title={`Frio: ${c.cold} (${c.pctCold}%)`}>
+                        {c.pctCold >= 10 && <span>{c.pctCold}%</span>}
+                      </div>
+                    )}
+                  </div>
+                  <div className="camp-nums">
+                    <span><i className="dot" style={{ background: 'var(--danger)' }} />Quente <strong>{c.hot}</strong></span>
+                    <span><i className="dot" style={{ background: 'var(--yellow)' }} />Morno <strong>{c.warm}</strong></span>
+                    <span><i className="dot" style={{ background: 'var(--blue)' }} />Frio <strong>{c.cold}</strong></span>
+                    <span className="camp-conv">Vendas <strong>{c.vendas}</strong> ({c.conversao}%)</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -240,7 +279,7 @@ export default function Desempenho() {
             </div>
           </div>
 
-          {/* ---------- motivos ---------- */}
+          {/* ---------- qualificação do sentimento ---------- */}
           <div className="panel card">
             <div className="card-head">
               <h2>Qualificação do sentimento</h2>
@@ -269,41 +308,43 @@ export default function Desempenho() {
             </div>
           </div>
 
-          {/* ---------- ranking ---------- */}
-          <div className="panel card">
-            <div className="card-head">
-              <h2>Comparativo por corretor</h2>
-              <span className="pill">{ranking.length}</span>
-            </div>
-            <div className="table-wrap">
-              <table className="rank-table">
-                <thead>
-                  <tr>
-                    <th>Corretor</th><th>Equipe</th>
-                    <th>Leads</th><th>Agend.</th><th>Prop.</th><th>Contr.</th><th>Vendas</th><th>Conv.</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ranking.map((r, i) => (
-                    <tr key={r.id}>
-                      <td><span className={`pos ${i === 0 ? 'top' : ''}`}>{i + 1}</span>{r.nome}</td>
-                      <td className="dim">{r.equipe}</td>
-                      <td>{r.leads}</td>
-                      <td>{r.agendamentos}</td>
-                      <td>{r.propostas}</td>
-                      <td>{r.contratos}</td>
-                      <td><strong>{r.vendas}</strong></td>
-                      <td>
-                        <span className={`conv ${r.conversao >= 10 ? 'alta' : r.conversao > 0 ? 'media' : 'zero'}`}>
-                          {r.conversao}%
-                        </span>
-                      </td>
+          {/* ---------- ranking (somente gestor) ---------- */}
+          {isGestor && (
+            <div className="panel card">
+              <div className="card-head">
+                <h2>Comparativo por corretor</h2>
+                <span className="pill">{ranking.length}</span>
+              </div>
+              <div className="table-wrap">
+                <table className="rank-table">
+                  <thead>
+                    <tr>
+                      <th>Corretor</th><th>Equipe</th>
+                      <th>Leads</th><th>Agend.</th><th>Prop.</th><th>Contr.</th><th>Vendas</th><th>Conv.</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {ranking.map((r, i) => (
+                      <tr key={r.id}>
+                        <td><span className={`pos ${i === 0 ? 'top' : ''}`}>{i + 1}</span>{r.nome}</td>
+                        <td className="dim">{r.equipe}</td>
+                        <td>{r.leads}</td>
+                        <td>{r.agendamentos}</td>
+                        <td>{r.propostas}</td>
+                        <td>{r.contratos}</td>
+                        <td><strong>{r.vendas}</strong></td>
+                        <td>
+                          <span className={`conv ${r.conversao >= 10 ? 'alta' : r.conversao > 0 ? 'media' : 'zero'}`}>
+                            {r.conversao}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          )}
         </>
       )}
     </>
