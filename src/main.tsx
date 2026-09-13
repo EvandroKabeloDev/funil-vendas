@@ -11,6 +11,7 @@ import './styles/pwa.css'
 import './styles/cadastro.css'
 import './styles/funil-sentimento.css'
 import './styles/campanhas.css'
+import './styles/correcoes.css'
 
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
