@@ -12,6 +12,13 @@ import {
 
 const RASCUNHO = 'funil:rascunho'
 
+type ResumoDia = {
+  id: string
+  campaign_id: string | null
+  leads: number
+  sales: number
+}
+
 export default function Lancamento() {
   const { profile, isGestor } = useAuth()
   const toast = useToast()
@@ -23,6 +30,7 @@ export default function Lancamento() {
   const [data, setData] = useState(hojeISO())
   const [form, setForm] = useState<EntryForm>(FORM_VAZIO)
   const [entryId, setEntryId] = useState<string | null>(null)
+  const [resumo, setResumo] = useState<ResumoDia[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [rascunhoRecuperado, setRascunhoRecuperado] = useState(false)
@@ -44,7 +52,6 @@ export default function Lancamento() {
           .from('campaigns')
           .select('id, org_id, name, is_active, created_by, created_at')
           .eq('is_active', true)
-          .eq('created_by', profile!.id)   // cada um lança com as próprias campanhas
           .order('name')
       ])
 
@@ -57,32 +64,47 @@ export default function Lancamento() {
     })()
   }, [isGestor, profile, toast])
 
-  // ---------- carrega o dia ----------
-  const carregarDia = useCallback(async () => {
+  // ---------- resumo do dia (todas as campanhas) ----------
+  const carregarResumo = useCallback(async () => {
+    if (!brokerId || !data) return
+    const { data: rows } = await supabase
+      .from('funnel_entries')
+      .select('id, campaign_id, leads, sales')
+      .eq('broker_id', brokerId)
+      .eq('entry_date', data)
+    setResumo((rows ?? []) as ResumoDia[])
+  }, [brokerId, data])
+
+  // ---------- carrega o lançamento de (corretor + data + campanha) ----------
+  const carregar = useCallback(async () => {
     if (!brokerId || !data) return
     setBusy(true)
-    const { data: row, error } = await supabase
+
+    let q = supabase
       .from('funnel_entries')
       .select('*')
       .eq('broker_id', brokerId)
       .eq('entry_date', data)
-      .maybeSingle()
+
+    // "Sem campanha" é um registro próprio, com campaign_id nulo
+    q = campaignId ? q.eq('campaign_id', campaignId) : q.is('campaign_id', null)
+
+    const { data: row, error } = await q.maybeSingle()
     setBusy(false)
     if (error) { toast(traduzErro(error), 'error'); return }
 
-    // rascunho tem prioridade sobre o banco (aba descartada no iOS)
+    // rascunho tem prioridade (aba descartada pelo iOS)
     const bruto = sessionStorage.getItem(RASCUNHO)
     if (bruto) {
       try {
         const r = JSON.parse(bruto)
-        if (r.brokerId === brokerId && r.data === data) {
+        if (r.brokerId === brokerId && r.data === data && (r.campaignId ?? '') === campaignId) {
           setEntryId(row?.id ?? null)
-          setCampaignId(r.campaignId ?? '')
           setForm(r.form)
           setRascunhoRecuperado(true)
           return
         }
-      } catch { /* rascunho inválido, segue com o banco */ }
+      } catch { /* rascunho inválido: segue com o banco */ }
     }
 
     setRascunhoRecuperado(false)
@@ -92,7 +114,6 @@ export default function Lancamento() {
         campaign_id, ...campos
       } = row
       setEntryId(id)
-      setCampaignId(campaign_id ?? '')
       setForm({
         ...FORM_VAZIO, ...campos,
         note_hot: campos.note_hot ?? '',
@@ -100,11 +121,13 @@ export default function Lancamento() {
         note_cold: campos.note_cold ?? ''
       })
     } else {
-      setEntryId(null); setCampaignId(''); setForm(FORM_VAZIO)
+      setEntryId(null)
+      setForm(FORM_VAZIO)
     }
-  }, [brokerId, data, toast])
+  }, [brokerId, data, campaignId, toast])
 
-  useEffect(() => { carregarDia() }, [carregarDia])
+  useEffect(() => { carregar() }, [carregar])
+  useEffect(() => { carregarResumo() }, [carregarResumo])
 
   // ---------- rascunho automático ----------
   useEffect(() => {
@@ -117,53 +140,82 @@ export default function Lancamento() {
     setForm(f => ({ ...f, [campo]: valor }))
   }
 
+  // trocar de campanha descarta o rascunho da campanha anterior
+  function trocarCampanha(novo: string) {
+    sessionStorage.removeItem(RASCUNHO)
+    tocado.current = false
+    setRascunhoRecuperado(false)
+    setCampaignId(novo)
+  }
+
   const erros = useMemo(() => validar(form), [form])
   const avisos = useMemo(() => alertasSuaves(form), [form])
   const restante = form.leads - (form.hot + form.warm + form.cold)
 
+  const nomeCampanha = (id: string | null) =>
+    id ? (campanhas.find(c => c.id === id)?.name ?? 'Campanha') : 'Sem campanha'
+
+  const totalDia = resumo.reduce((t, r) => t + r.leads, 0)
+
   async function salvar() {
     if (erros.length) return toast(erros[0], 'error')
     setBusy(true)
-    const payload = {
-      org_id: profile!.org_id,
-      broker_id: brokerId,
-      entry_date: data,
-      campaign_id: campaignId || null,
+
+    const campos = {
       ...form,
       note_hot: form.note_hot.trim() || null,
       note_warm: form.note_warm.trim() || null,
-      note_cold: form.note_cold.trim() || null,
-      created_by: profile!.id
+      note_cold: form.note_cold.trim() || null
     }
-    const { error } = await supabase
-      .from('funnel_entries')
-      .upsert(payload, { onConflict: 'broker_id,entry_date' })
+
+    // UPDATE quando o registro já existe; INSERT quando é novo.
+    // Não usamos upsert para não depender de inferência de conflito.
+    const { error } = entryId
+      ? await supabase.from('funnel_entries').update(campos).eq('id', entryId)
+      : await supabase.from('funnel_entries').insert({
+          org_id: profile!.org_id,
+          broker_id: brokerId,
+          entry_date: data,
+          campaign_id: campaignId || null,
+          created_by: profile!.id,
+          ...campos
+        })
+
     setBusy(false)
-    if (error) return toast(traduzErro(error), 'error')
+    if (error) {
+      if (/duplicate key|23505/i.test(error.message)) {
+        return toast('Já existe um lançamento desta campanha nesta data. Recarregue a página.', 'error')
+      }
+      return toast(traduzErro(error), 'error')
+    }
+
     sessionStorage.removeItem(RASCUNHO)
     tocado.current = false
     setRascunhoRecuperado(false)
     toast(entryId ? 'Lançamento atualizado.' : 'Lançamento salvo.')
-    carregarDia()
+    carregar()
+    carregarResumo()
   }
 
   async function excluir() {
     if (!entryId) return
-    if (!confirm(`Excluir o lançamento de ${formatarData(data)}?`)) return
+    if (!confirm(`Excluir o lançamento de ${nomeCampanha(campaignId || null)} em ${formatarData(data)}?`)) return
     setBusy(true)
     const { error } = await supabase.from('funnel_entries').delete().eq('id', entryId)
     setBusy(false)
     if (error) return toast(traduzErro(error), 'error')
     sessionStorage.removeItem(RASCUNHO)
     toast('Lançamento excluído.')
-    setEntryId(null); setForm(FORM_VAZIO); setCampaignId('')
+    setEntryId(null)
+    setForm(FORM_VAZIO)
+    carregarResumo()
   }
 
   function descartarRascunho() {
     sessionStorage.removeItem(RASCUNHO)
     tocado.current = false
     setRascunhoRecuperado(false)
-    carregarDia()
+    carregar()
   }
 
   if (loading) return <div className="panel card"><div className="empty">Carregando…</div></div>
@@ -202,9 +254,37 @@ export default function Lancamento() {
           <input id="data" type="date" value={data} max={amanhaISO()} onChange={e => setData(e.target.value)} />
         </div>
         <div className={`status-chip ${entryId ? 'edit' : 'new'}`}>
-          {entryId ? 'Editando dia já lançado' : 'Novo lançamento'}
+          {entryId ? 'Editando lançamento existente' : 'Novo lançamento'}
         </div>
       </div>
+
+      {/* ---------- lançamentos já registrados no dia ---------- */}
+      {resumo.length > 0 && (
+        <div className="panel card dia-resumo">
+          <div className="card-head">
+            <h2>Já lançado em {formatarData(data)}</h2>
+            <span className="pill">{totalDia} lead(s)</span>
+          </div>
+          <div className="dia-chips">
+            {resumo.map(r => {
+              const ativo = (r.campaign_id ?? '') === campaignId
+              return (
+                <button
+                  key={r.id}
+                  className={`dia-chip ${ativo ? 'ativo' : ''}`}
+                  onClick={() => trocarCampanha(r.campaign_id ?? '')}
+                >
+                  <strong>{nomeCampanha(r.campaign_id)}</strong>
+                  <span>{r.leads} leads · {r.sales} vendas</span>
+                </button>
+              )
+            })}
+          </div>
+          <p className="hint-block">
+            Cada campanha tem o seu próprio lançamento no dia. Clique para abrir e editar.
+          </p>
+        </div>
+      )}
 
       {/* ---------- leads ---------- */}
       <div className="panel card">
@@ -212,7 +292,7 @@ export default function Lancamento() {
           <h2>Leads recebidos</h2>
           <div className="head-campanha">
             <label htmlFor="campanha">Campanha</label>
-            <select id="campanha" value={campaignId} onChange={e => { tocado.current = true; setCampaignId(e.target.value) }}>
+            <select id="campanha" value={campaignId} onChange={e => trocarCampanha(e.target.value)}>
               <option value="">{campanhas.length ? 'Sem campanha' : 'Nenhuma campanha cadastrada'}</option>
               {campanhas.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
@@ -300,7 +380,7 @@ export default function Lancamento() {
         <button className="btn primary" onClick={salvar} disabled={busy || erros.length > 0}>
           {busy ? 'Salvando…' : entryId ? 'Atualizar lançamento' : 'Salvar lançamento'}
         </button>
-        {entryId && <button className="btn danger" onClick={excluir} disabled={busy}>Excluir dia</button>}
+        {entryId && <button className="btn danger" onClick={excluir} disabled={busy}>Excluir lançamento</button>}
       </div>
     </>
   )
